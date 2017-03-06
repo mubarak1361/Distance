@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_height="match_parent"
+    android:layout_width="match_parent"
+    android:orientation="vertical"
+    xmlns:tools="http://schemas.android.com/tools"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+
+    <android.support.v7.widget.Toolbar
+        android:id="@+id/toolbar_family_details"
+        android:layout_width="match_parent"
+        android:layout_height="?attr/actionBarSize"
+        app:titleTextColor="@android:color/white"
+        app:theme="@style/ToolbarStyle"
+        android:background="?attr/colorPrimary" />
+
+    <android.support.design.widget.CoordinatorLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <android.support.design.widget.AppBarLayout
+            android:id="@+id/app_bar_family_details"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:fitsSystemWindows="true">
+
+            <android.support.design.widget.CollapsingToolbarLayout
+                android:id="@+id/collapsing_toolbar"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:fitsSystemWindows="true"
+                app:contentScrim="?attr/colorPrimary"
+                app:titleEnabled="false">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center"
+                    android:orientation="vertical"
+                    android:layout_marginStart="16dp"
+                    android:layout_marginEnd="16dp"
+                    android:layout_marginLeft="16dp"
+                    android:layout_marginRight="16dp"
+                    android:layout_marginBottom="28dp"
+                    app:layout_scrollFlags="scroll|enterAlways">
+
+                    <android.support.v7.widget.AppCompatAutoCompleteTextView
+                        android:id="@+id/source"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:ems="10"
+                        android:textAppearance="@style/TextLabel"
+                        android:hint="Source" />
+
+                    <android.support.v7.widget.AppCompatAutoCompleteTextView
+                        android:id="@+id/dest"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:ems="10"
+                        android:textAppearance="@style/TextLabel"
+                        android:hint="Destinataion" />
+
+                </LinearLayout>
+
+
+            </android.support.design.widget.CollapsingToolbarLayout>
+
+        </android.support.design.widget.AppBarLayout>
+
+        <fragment
+            android:id="@+id/map_fragment"
+            android:layout_width="match_parent"
+            android:clipToPadding="false"
+            android:paddingTop="20dp"
+            android:name="com.google.android.gms.maps.SupportMapFragment"
+            app:layout_behavior="@string/appbar_scrolling_view_behavior"
+            android:layout_height="match_parent"/>
+
+        <android.support.design.widget.FloatingActionButton
+            android:id="@+id/floating_btn_add_member"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginRight="16dp"
+            app:backgroundTint="?attr/colorPrimaryDark"
+            android:src="@android:drawable/ic_menu_directions"
+            android:scaleType="fitXY"
+            android:adjustViewBounds="true"
+            app:layout_anchor="@id/app_bar_family_details"
+            app:layout_anchorGravity="bottom|right|end" />
+
+    </android.support.design.widget.CoordinatorLayout>
+</LinearLayout>
