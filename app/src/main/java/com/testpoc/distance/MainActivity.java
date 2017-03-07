@@ -3,8 +3,11 @@ package com.testpoc.distance;
 import android.content.Context;
 import android.content.IntentSender;
 import android.content.pm.PackageManager;
+import android.graphics.Color;
+import android.location.Geocoder;
 import android.location.Location;
 import android.location.LocationManager;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
@@ -12,6 +15,8 @@ import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.AppCompatAutoCompleteTextView;
 import android.support.v7.widget.Toolbar;
+import android.text.TextUtils;
+import android.view.View;
 
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
@@ -31,7 +36,16 @@ import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.LatLng;
-import com.google.android.gms.maps.model.MarkerOptions;
+import com.google.android.gms.maps.model.PolylineOptions;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+import java.io.UnsupportedEncodingException;
+import java.net.URLEncoder;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
 
 public class MainActivity extends AppCompatActivity implements GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener, LocationListener{
 
@@ -41,10 +55,12 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
     private final int PERMISSION_ACCESS_COARSE_LOCATION = 200;
     private GoogleApiClient googleApiClient;
     private long UPDATE_INTERVAL = 10 * 1000;
-    private long FASTEST_INTERVAL = 1000;
+    private long FASTEST_INTERVAL = 5000;
     private LocationRequest mLocationRequest;
     private SupportMapFragment mapFragment;
     private GoogleMap googleMap;
+    private ArrayList<LatLng> list = new ArrayList<>();
+    private boolean isInitial = true;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -74,6 +90,52 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
                 .addOnConnectionFailedListener(this)
                 .addApi(LocationServices.API)
                 .build();
+        findViewById(R.id.floating_btn_direction).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                if(!TextUtils.isEmpty(source.getText()) && !TextUtils.isEmpty(destination.getText())) {
+                    try {
+                        final String url = "https://maps.googleapis.com/maps/api/directions/json?origin=" + URLEncoder.encode(source.getText().toString(),"utf8") + "&destination=" + URLEncoder.encode(destination.getText().toString(),"utf8") + "&sensor=false";
+
+                    new AsyncTask<String, Void, JSONObject>() {
+                        @Override
+                        protected JSONObject doInBackground(String... strings) {
+                            return WebServiceHelper.runService(url, null, WebServiceHelper.RequestType.GET);
+
+                        }
+
+                        @Override
+                        protected void onPostExecute(JSONObject jsonObject) {
+                            super.onPostExecute(jsonObject);
+                            try {
+
+                                JSONArray routeArray = jsonObject.getJSONArray("routes");
+                                JSONObject routes = routeArray.getJSONObject(0);
+                                JSONObject jsonObject1 =routes.getJSONObject("bounds").getJSONObject("northeast");
+                                LatLng current = new LatLng( Double.parseDouble( jsonObject1.getString("lat")),Double.parseDouble(jsonObject1.getString("lng")));
+                                CameraUpdate cameraUpdate = CameraUpdateFactory.newLatLngZoom(current, 15);
+                                googleMap.animateCamera(cameraUpdate);
+                                isInitial =false;
+                                JSONObject overviewPolylines = routes
+                                        .getJSONObject("overview_polyline");
+                                String encodedString = overviewPolylines.getString("points");
+                                list = decodePoly(encodedString);
+
+                                // Polylines are useful for marking paths and routes on the map.
+                                googleMap.addPolyline(new PolylineOptions().geodesic(true).color(Color.BLUE)
+                                        .addAll(list)
+                                );
+                            } catch (Exception e) {
+                                e.printStackTrace();
+                            }
+                        }
+                    }.execute();
+                    } catch (UnsupportedEncodingException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+        });
     }
 
     private boolean checkLocationPermission() {
@@ -112,19 +174,13 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
 
     @Override
     public void onLocationChanged(Location location) {
-        mapFragment.getMapAsync(new OnMapReadyCallback() {
-            @Override
-            public void onMapReady(GoogleMap googleMap) {
-                MainActivity.this.googleMap = googleMap;
-
-            }
-        });
-        if(googleMap!=null){
+        if(isInitial) {
             LatLng current = new LatLng(location.getLatitude(), location.getLongitude());
-            googleMap.addMarker(new MarkerOptions().position(current).title("Present Location"));
             CameraUpdate cameraUpdate = CameraUpdateFactory.newLatLngZoom(current, 15);
             googleMap.animateCamera(cameraUpdate);
+            isInitial =false;
         }
+
     }
 
 
@@ -144,6 +200,33 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
 
             PendingResult<LocationSettingsResult> result = LocationServices.SettingsApi
                     .checkLocationSettings(googleApiClient, builder.build());
+
+            mapFragment.getMapAsync(new OnMapReadyCallback() {
+                @Override
+                public void onMapReady(GoogleMap googleMap) {
+                    MainActivity.this.googleMap = googleMap;
+
+                }
+            });
+
+            Location location  = LocationServices.FusedLocationApi.getLastLocation(googleApiClient);
+
+            try {
+                Geocoder geo = new Geocoder(MainActivity.this, Locale.getDefault());
+                List<android.location.Address> addresses = geo.getFromLocation(location.getLatitude(), location.getLongitude(), 1);
+                if (addresses.isEmpty()) {
+
+                }
+                else {
+                    if (addresses.size() > 0) {
+                        source.setText(addresses.get(0).getFeatureName() + ", " + addresses.get(0).getLocality() +", " + addresses.get(0).getAdminArea() + ", " + addresses.get(0).getCountryName());
+                        //Toast.makeText(getApplicationContext(), "Address:- " + addresses.get(0).getFeatureName() + addresses.get(0).getAdminArea() + addresses.get(0).getLocality(), Toast.LENGTH_LONG).show();
+                    }
+                }
+            }
+            catch (Exception e) {
+                e.printStackTrace(); // getFromLocation() may sometimes fail
+            }
 
             result.setResultCallback(new ResultCallback<LocationSettingsResult>() {
                 @Override
@@ -198,5 +281,40 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
     public void onConnectionFailed(@NonNull ConnectionResult connectionResult) {
 
     }
+
+    private ArrayList<LatLng> decodePoly(String encoded) {
+
+        ArrayList<LatLng> poly = new ArrayList<LatLng>();
+        int index = 0, len = encoded.length();
+        int lat = 0, lng = 0;
+
+        while (index < len) {
+            int b, shift = 0, result = 0;
+            do {
+                b = encoded.charAt(index++) - 63;
+                result |= (b & 0x1f) << shift;
+                shift += 5;
+            } while (b >= 0x20);
+            int dlat = ((result & 1) != 0 ? ~(result >> 1) : (result >> 1));
+            lat += dlat;
+
+            shift = 0;
+            result = 0;
+            do {
+                b = encoded.charAt(index++) - 63;
+                result |= (b & 0x1f) << shift;
+                shift += 5;
+            } while (b >= 0x20);
+            int dlng = ((result & 1) != 0 ? ~(result >> 1) : (result >> 1));
+            lng += dlng;
+
+            LatLng p = new LatLng((((double) lat / 1E5)),
+                    (((double) lng / 1E5)));
+            poly.add(p);
+        }
+
+        return poly;
+    }
+
 
 }
