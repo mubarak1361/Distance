@@ -68,14 +68,92 @@
 
         </android.support.design.widget.AppBarLayout>
 
+        <RelativeLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:layout_behavior="@string/appbar_scrolling_view_behavior">
+
         <fragment
             android:id="@+id/map_fragment"
             android:layout_width="match_parent"
             android:clipToPadding="false"
             android:paddingTop="20dp"
             android:name="com.google.android.gms.maps.SupportMapFragment"
-            app:layout_behavior="@string/appbar_scrolling_view_behavior"
             android:layout_height="match_parent"/>
+
+            <LinearLayout
+                android:id="@+id/linear_footer_container"
+                android:layout_width="match_parent"
+                android:layout_height="80dp"
+                android:layout_marginRight="16dp"
+                android:layout_marginLeft="16dp"
+                android:layout_marginBottom="16dp"
+                android:background="@android:color/white"
+                android:orientation="horizontal"
+                android:weightSum="5"
+                android:padding="12dp"
+                android:layout_alignParentBottom="true">
+
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:orientation="vertical"
+                    android:gravity="center"
+                    android:layout_weight="2.5">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textColor="@android:color/black"
+                        android:textStyle="bold"
+                        android:textSize="16sp"
+                        android:text="Distance"/>
+
+                    <TextView
+                        android:id="@+id/txt_distance"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textColor="@android:color/black"
+                        android:textStyle="normal"
+                        android:textSize="16sp"/>
+
+                </LinearLayout>
+
+                <View
+                    android:layout_width="1dp"
+                    android:layout_height="match_parent"
+                    android:background="@android:color/black"/>
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:orientation="vertical"
+                    android:gravity="center"
+                    android:layout_weight="2.5">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textColor="@android:color/black"
+                        android:textStyle="bold"
+                        android:text="Duration"
+                        android:textSize="16sp"/>
+
+                    <TextView
+                        android:id="@+id/txt_durarion"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textColor="@android:color/black"
+                        android:textStyle="normal"
+                        android:textSize="16sp"/>
+
+
+                </LinearLayout>
+
+            </LinearLayout>
+
+        </RelativeLayout>
 
         <android.support.design.widget.FloatingActionButton
             android:id="@+id/floating_btn_direction"

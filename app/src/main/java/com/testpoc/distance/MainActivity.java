@@ -17,6 +17,8 @@ import android.support.v7.widget.AppCompatAutoCompleteTextView;
 import android.support.v7.widget.Toolbar;
 import android.text.TextUtils;
 import android.view.View;
+import android.view.inputmethod.InputMethodManager;
+import android.widget.TextView;
 
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
@@ -79,7 +81,7 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
          mapFragment = (SupportMapFragment) getSupportFragmentManager()
                 .findFragmentById(R.id.map_fragment);
 
-
+        findViewById(R.id.linear_footer_container).setVisibility(View.GONE);
         Padapter =  new PlacesAutoCompleteAdapter(this, android.R.layout.simple_list_item_1);
         source.setAdapter(Padapter);
         destination.setAdapter(Padapter);
@@ -121,10 +123,23 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
                                 String encodedString = overviewPolylines.getString("points");
                                 list = decodePoly(encodedString);
 
+                                JSONArray legsJsonArray = routeArray.getJSONObject(0).getJSONArray("legs");
+                                // Extract the Place descriptions from the results
+                                findViewById(R.id.linear_footer_container).setVisibility(View.VISIBLE);
+                                // store Killometer in Distance
+                                JSONObject path = legsJsonArray.getJSONObject(0);
+                                JSONObject distance =  path.getJSONObject("distance");
+                                JSONObject duration =  path.getJSONObject("duration");
+
+                                ((TextView)findViewById(R.id.txt_distance)).setText(distance.getString("text"));
+                                ((TextView)findViewById(R.id.txt_durarion)).setText(duration.getString("text"));
+
                                 // Polylines are useful for marking paths and routes on the map.
                                 googleMap.addPolyline(new PolylineOptions().geodesic(true).color(Color.BLUE)
-                                        .addAll(list)
-                                );
+                                        .addAll(list));
+
+                                InputMethodManager imm = (InputMethodManager)getSystemService(Context.INPUT_METHOD_SERVICE);
+                                imm.toggleSoftInput(InputMethodManager.HIDE_NOT_ALWAYS, 0);
                             } catch (Exception e) {
                                 e.printStackTrace();
                             }
