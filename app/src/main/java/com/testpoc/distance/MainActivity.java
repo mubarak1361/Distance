@@ -1,6 +1,7 @@
 package com.testpoc.distance;
 
 import android.content.Context;
+import android.content.Intent;
 import android.content.IntentSender;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
@@ -16,8 +17,8 @@ import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.AppCompatAutoCompleteTextView;
 import android.support.v7.widget.Toolbar;
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.View;
-import android.view.inputmethod.InputMethodManager;
 import android.widget.TextView;
 
 import com.google.android.gms.common.ConnectionResult;
@@ -38,6 +39,9 @@ import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.Marker;
+import com.google.android.gms.maps.model.MarkerOptions;
+import com.google.android.gms.maps.model.Polyline;
 import com.google.android.gms.maps.model.PolylineOptions;
 
 import org.json.JSONArray;
@@ -49,9 +53,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
-public class MainActivity extends AppCompatActivity implements GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener, LocationListener{
+public class MainActivity extends AppCompatActivity implements GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener, LocationListener {
 
-    private AppCompatAutoCompleteTextView source,destination;
+    private AppCompatAutoCompleteTextView source, destination;
     private PlacesAutoCompleteAdapter Padapter;
     private Toolbar toolbar;
     private final int PERMISSION_ACCESS_COARSE_LOCATION = 200;
@@ -63,14 +67,17 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
     private GoogleMap googleMap;
     private ArrayList<LatLng> list = new ArrayList<>();
     private boolean isInitial = true;
+    private Polyline polyline;
+    private Marker m1, m2;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+
         toolbar = (Toolbar) findViewById(R.id.toolbar_family_details);
-        source =  (AppCompatAutoCompleteTextView) findViewById(R.id.source);
+        source = (AppCompatAutoCompleteTextView) findViewById(R.id.source);
         destination = (AppCompatAutoCompleteTextView) findViewById(R.id.dest);
 
         source.setThreshold(3);
@@ -78,13 +85,21 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
 
         setSupportActionBar(toolbar);
 
-         mapFragment = (SupportMapFragment) getSupportFragmentManager()
+        mapFragment = (SupportMapFragment) getSupportFragmentManager()
                 .findFragmentById(R.id.map_fragment);
 
         findViewById(R.id.linear_footer_container).setVisibility(View.GONE);
-        Padapter =  new PlacesAutoCompleteAdapter(this, android.R.layout.simple_list_item_1);
+        Padapter = new PlacesAutoCompleteAdapter(this, android.R.layout.simple_list_item_1);
         source.setAdapter(Padapter);
         destination.setAdapter(Padapter);
+
+        destination.setText(getIntent().getStringExtra("DeliveryPlace"));
+        destination.setFocusable(false);
+        destination.setClickable(false);
+
+        source.setFocusable(false);
+        source.setClickable(false);
+
         LocationManager lm = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
 
         googleApiClient = new GoogleApiClient.Builder(this)
@@ -95,56 +110,84 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
         findViewById(R.id.floating_btn_direction).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                if(!TextUtils.isEmpty(source.getText()) && !TextUtils.isEmpty(destination.getText())) {
+                if (!TextUtils.isEmpty(source.getText()) && !TextUtils.isEmpty(destination.getText())) {
                     try {
-                        final String url = "https://maps.googleapis.com/maps/api/directions/json?origin=" + URLEncoder.encode(source.getText().toString(),"utf8") + "&destination=" + URLEncoder.encode(destination.getText().toString(),"utf8") + "&sensor=false";
+                        final String url = "https://maps.googleapis.com/maps/api/directions/json?origin=" + URLEncoder.encode(source.getText().toString(), "utf8") + "&destination=" + URLEncoder.encode(destination.getText().toString(), "utf8") + "&sensor=false";
 
-                    new AsyncTask<String, Void, JSONObject>() {
-                        @Override
-                        protected JSONObject doInBackground(String... strings) {
-                            return WebServiceHelper.runService(url, null, WebServiceHelper.RequestType.GET);
+                        new AsyncTask<String, Void, JSONObject>() {
+                            @Override
+                            protected JSONObject doInBackground(String... strings) {
+                                return WebServiceHelper.runService(url, null, WebServiceHelper.RequestType.GET);
 
-                        }
-
-                        @Override
-                        protected void onPostExecute(JSONObject jsonObject) {
-                            super.onPostExecute(jsonObject);
-                            try {
-
-                                JSONArray routeArray = jsonObject.getJSONArray("routes");
-                                JSONObject routes = routeArray.getJSONObject(0);
-                                JSONObject jsonObject1 =routes.getJSONObject("bounds").getJSONObject("northeast");
-                                LatLng current = new LatLng( Double.parseDouble( jsonObject1.getString("lat")),Double.parseDouble(jsonObject1.getString("lng")));
-                                CameraUpdate cameraUpdate = CameraUpdateFactory.newLatLngZoom(current, 15);
-                                googleMap.animateCamera(cameraUpdate);
-                                isInitial =false;
-                                JSONObject overviewPolylines = routes
-                                        .getJSONObject("overview_polyline");
-                                String encodedString = overviewPolylines.getString("points");
-                                list = decodePoly(encodedString);
-
-                                JSONArray legsJsonArray = routeArray.getJSONObject(0).getJSONArray("legs");
-                                // Extract the Place descriptions from the results
-                                findViewById(R.id.linear_footer_container).setVisibility(View.VISIBLE);
-                                // store Killometer in Distance
-                                JSONObject path = legsJsonArray.getJSONObject(0);
-                                JSONObject distance =  path.getJSONObject("distance");
-                                JSONObject duration =  path.getJSONObject("duration");
-
-                                ((TextView)findViewById(R.id.txt_distance)).setText(distance.getString("text"));
-                                ((TextView)findViewById(R.id.txt_durarion)).setText(duration.getString("text"));
-
-                                // Polylines are useful for marking paths and routes on the map.
-                                googleMap.addPolyline(new PolylineOptions().geodesic(true).color(Color.BLUE)
-                                        .addAll(list));
-
-                                InputMethodManager imm = (InputMethodManager)getSystemService(Context.INPUT_METHOD_SERVICE);
-                                imm.toggleSoftInput(InputMethodManager.HIDE_NOT_ALWAYS, 0);
-                            } catch (Exception e) {
-                                e.printStackTrace();
                             }
-                        }
-                    }.execute();
+
+                            @Override
+                            protected void onPostExecute(JSONObject jsonObject) {
+                                super.onPostExecute(jsonObject);
+                                try {
+
+                                    JSONArray routeArray = jsonObject.getJSONArray("routes");
+                                    JSONObject routes = routeArray.getJSONObject(0);
+
+                                    JSONObject overviewPolylines = routes
+                                            .getJSONObject("overview_polyline");
+                                    String encodedString = overviewPolylines.getString("points");
+                                    list = decodePoly(encodedString);
+
+                                    JSONArray legsJsonArray = routeArray.getJSONObject(0).getJSONArray("legs");
+                                    // Extract the Place descriptions from the results
+
+
+                                    findViewById(R.id.linear_footer_container).setVisibility(View.VISIBLE);
+                                    // store Killometer in Distance
+                                    JSONObject path = legsJsonArray.getJSONObject(0);
+
+                                    JSONObject location = path.getJSONObject("start_location");
+                                    JSONObject endLocation = path.getJSONObject("end_location");
+                                    LatLng current = new LatLng(Double.parseDouble(location.getString("lat")), Double.parseDouble(location.getString("lng")));
+                                    LatLng end = new LatLng(Double.parseDouble(endLocation.getString("lat")), Double.parseDouble(endLocation.getString("lng")));
+                                    CameraUpdate cameraUpdate = CameraUpdateFactory.newLatLngZoom(current, 6);
+                                    googleMap.animateCamera(cameraUpdate);
+                                    isInitial = false;
+
+                                    JSONObject distance = path.getJSONObject("distance");
+                                    JSONObject duration = path.getJSONObject("duration");
+
+                                    ((TextView) findViewById(R.id.txt_distance)).setText(distance.getString("text"));
+                                    ((TextView) findViewById(R.id.txt_durarion)).setText(duration.getString("text"));
+
+                                    // Polylines are useful for marking paths and routes on the map.
+
+                                    if (m1 != null) {
+                                        m1.remove();
+                                    }
+
+                                    if (m2 != null) {
+                                        m2.remove();
+                                    }
+
+                                    if (polyline != null) {
+                                        polyline.remove();
+                                    }
+
+                                    m1 = googleMap.addMarker(new MarkerOptions()
+                                            .position(current)
+                                            .title("Your Location")
+                                            .draggable(true).visible(true));
+
+                                    m2 = googleMap.addMarker(new MarkerOptions()
+                                            .position(end)
+                                            .title("Delivery Location")
+                                            .draggable(true).visible(true));
+
+                                    polyline = googleMap.addPolyline(new PolylineOptions().geodesic(true).color(Color.BLUE)
+                                            .addAll(list));
+
+                                } catch (Exception e) {
+                                    e.printStackTrace();
+                                }
+                            }
+                        }.execute();
                     } catch (UnsupportedEncodingException e) {
                         e.printStackTrace();
                     }
@@ -189,11 +232,34 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
 
     @Override
     public void onLocationChanged(Location location) {
-        if(isInitial) {
+        if (isInitial) {
             LatLng current = new LatLng(location.getLatitude(), location.getLongitude());
-            CameraUpdate cameraUpdate = CameraUpdateFactory.newLatLngZoom(current, 15);
+            CameraUpdate cameraUpdate = CameraUpdateFactory.newLatLngZoom(current, 6);
             googleMap.animateCamera(cameraUpdate);
-            isInitial =false;
+
+            isInitial = false;
+
+            if (checkLocationPermission()) {
+                Location location1 = LocationServices.FusedLocationApi.getLastLocation(googleApiClient);
+
+                try {
+                    Geocoder geo = new Geocoder(MainActivity.this, Locale.getDefault());
+                    List<android.location.Address> addresses = geo.getFromLocation(location.getLatitude(), location.getLongitude(), 1);
+                    if (addresses.isEmpty()) {
+
+                    } else {
+                        if (addresses.size() > 0) {
+                            source.setText(addresses.get(0).getFeatureName() + ", " + addresses.get(0).getLocality() + ", " + addresses.get(0).getAdminArea() + ", " + addresses.get(0).getCountryName());
+                            //Toast.makeText(getApplicationContext(), "Address:- " + addresses.get(0).getFeatureName() + addresses.get(0).getAdminArea() + addresses.get(0).getLocality(), Toast.LENGTH_LONG).show();
+                        }
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace(); // getFromLocation() may sometimes fail
+                }
+
+                findViewById(R.id.floating_btn_direction).performClick();
+
+            }
         }
 
     }
@@ -224,22 +290,20 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
                 }
             });
 
-            Location location  = LocationServices.FusedLocationApi.getLastLocation(googleApiClient);
+            Location location = LocationServices.FusedLocationApi.getLastLocation(googleApiClient);
 
             try {
                 Geocoder geo = new Geocoder(MainActivity.this, Locale.getDefault());
                 List<android.location.Address> addresses = geo.getFromLocation(location.getLatitude(), location.getLongitude(), 1);
                 if (addresses.isEmpty()) {
 
-                }
-                else {
+                } else {
                     if (addresses.size() > 0) {
-                        source.setText(addresses.get(0).getFeatureName() + ", " + addresses.get(0).getLocality() +", " + addresses.get(0).getAdminArea() + ", " + addresses.get(0).getCountryName());
+                        source.setText(addresses.get(0).getFeatureName() + ", " + addresses.get(0).getLocality() + ", " + addresses.get(0).getAdminArea() + ", " + addresses.get(0).getCountryName());
                         //Toast.makeText(getApplicationContext(), "Address:- " + addresses.get(0).getFeatureName() + addresses.get(0).getAdminArea() + addresses.get(0).getLocality(), Toast.LENGTH_LONG).show();
                     }
                 }
-            }
-            catch (Exception e) {
+            } catch (Exception e) {
                 e.printStackTrace(); // getFromLocation() may sometimes fail
             }
 
@@ -276,7 +340,7 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
                     }
                 }
             });
-        }else {
+        } else {
             ActivityCompat.requestPermissions(this, new String[]{android.Manifest.permission.ACCESS_FINE_LOCATION, android.Manifest.permission.ACCESS_COARSE_LOCATION},
                     PERMISSION_ACCESS_COARSE_LOCATION);
         }
@@ -332,4 +396,24 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
     }
 
 
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+            googleApiClient.connect();
+        }
+
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        Log.d("TAG", "onActivityResult() called with: " + "requestCode = [" + requestCode + "], resultCode = [" + resultCode + "], data = [" + data + "]");
+        switch (requestCode) {
+
+            case 1000:
+                googleApiClient.connect();
+                break;
+
+        }
+    }
 }
